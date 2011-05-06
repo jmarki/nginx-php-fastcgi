@@ -23,7 +23,7 @@ Requires(preun):    chkconfig, initscripts
 Requires(postun):   initscripts
 Provides:           webserver
 
-Source0:    https://github.com/jmarki/nginx-php-fastcgi/tarball/0.1/%{name}-%{version}.tar.gz
+Source0:    https://github.com/jmarki/nginx-php-fastcgi/%{name}-%{version}.tar.gz
 
 %description
 PHP-CGI daemon for Nginx [engine x], using FastCGI
