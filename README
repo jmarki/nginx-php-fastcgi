@@ -1,0 +1,2 @@
+Setup Nginx for PHP-CGI access using FastCGI.
+Init script and Spec file written for RHEL5.

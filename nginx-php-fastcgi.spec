@@ -1,0 +1,79 @@
+%define nginx_user      nginx
+%define nginx_home      %{_localstatedir}/lib/nginx
+%define nginx_confdir   %{_sysconfdir}/nginx
+
+Name:           nginx-php-fastcgi
+Version:        0.1
+Release:        1%{?dist}
+Summary:        PHP-CGI daemon for nginx, using FastCGI
+Group:          System Environment/Daemons
+
+# BSD License (two clause)
+# http://www.freebsd.org/copyright/freebsd-license.html
+License:        BSD
+URL:            http://github.com/jmarki/nginx-php-fastcgi
+BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
+
+Requires:           php-cli,gawk
+# for /usr/sbin/useradd
+Requires(pre):      shadow-utils
+Requires(post):     chkconfig
+# for /sbin/service
+Requires(preun):    chkconfig, initscripts
+Requires(postun):   initscripts
+Provides:           webserver
+
+Source0:    https://github.com/jmarki/nginx-php-fastcgi/tarball/0.1/%{name}-%{version}.tar.gz
+
+%description
+PHP-CGI daemon for Nginx [engine x], using FastCGI
+
+%prep
+%setup -q
+
+%build
+
+%install
+rm -rf %{buildroot}
+%{__install} -p -d -m 0755 %{buildroot}%{nginx_confdir}/conf.d
+%{__install} -p -d -m 0755 %{buildroot}%{_initrddir}
+%{__install} -p -m 0644 %{name}.conf %{buildroot}%{nginx_confdir}/conf.d
+%{__install} -p -m 0644 fastcgi_params_php %{buildroot}%{nginx_confdir}/conf.d
+%{__install} -p -m 0755 %{name}.init %{buildroot}%{_initrddir}/%{name}
+
+
+%clean
+rm -rf %{buildroot}
+
+%pre
+if [ $1 == 1 ]; then
+    %{_sbindir}/useradd -c "Nginx user" -s /bin/false -r -d %{nginx_home} %{nginx_user} 2>/dev/null || :
+fi
+
+%post
+if [ $1 == 1 ]; then
+    /sbin/chkconfig --add %{name}
+fi
+
+%preun
+if [ $1 = 0 ]; then
+    /sbin/service %{name} stop >/dev/null 2>&1
+    /sbin/chkconfig --del %{name}
+fi
+
+%postun
+if [ $1 == 2 ]; then
+    /sbin/service %{name} upgrade || :
+fi
+
+%files
+%defattr(-,root,root,-)
+%{_initrddir}/%{name}
+%config(noreplace) %{nginx_confdir}/conf.d/%{name}.conf
+%config(noreplace) %{nginx_confdir}/conf.d/fastcgi_params_php
+
+
+%changelog
+* Thu May 05 2011 Koo Jun Hao <junhao82 at jmarki dot net> - 0.1-1
+- modified from Nginx spec file from Fedora EPEL repository
+- initial commit of init files and configuration for PHP-CGI on nginx

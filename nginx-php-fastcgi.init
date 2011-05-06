@@ -1,0 +1,107 @@
+#!/bin/sh
+#
+# nginx-php-fastcgi - this script starts and stops a php process used
+# to spawn/proxy fastcgi
+#
+# chkconfig:   - 85 15
+# description:  Nginx-php-fastcgi uses php to spawn fastcgi processes for
+#		Nginx.
+# processname: nginx-php-fastcgi
+# config:      /etc/nginx/nginx-php-fastcgi.conf
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+# Source networking configuration.
+. /etc/sysconfig/network
+
+# Check that networking is up.
+[ "$NETWORKING" = "no" ] && exit 0
+
+get_config() {
+	# Source configuration parameters
+	CONFIG="/etc/nginx/nginx-php-fastcgi.conf"
+	[ -f "${CONFIG}" ] || exit 6
+
+	BIND=$(awk -F"=" '/BIND/ {print $2}' ${CONFIG})
+	USER=$(awk -F"=" '/USER/ {print $2}' ${CONFIG})
+	PHP_CGI=$(awk -F"=" '/PHP_CGI/ {print $2}' ${CONFIG})
+	PHP_FCGI_CHILDREN=$(awk -F"=" '/PHP_FCGI_CHILDREN/ {print $2}' ${CONFIG})
+	PHP_FCGI_MAX_REQUESTS=$(awk -F"=" '/PHP_FCGI_MAX_REQUESTS/ {print $2}' ${CONFIG})
+
+	: ${BIND:-/var/lib/nginx/nginx-php-fastcgi.socket}
+	: ${USER:-nginx}
+	: ${PHP_CGI:-/usr/bin/php-cgi}
+	: ${PHP_FCGI_CHILDREN:-15}
+	: ${PHP_FCGI_MAX_REQUESTS:-1000}
+
+	PHP_CGI_NAME=$(/bin/basename ${PHP_CGI})
+	PHP_CGI_ARGS="USER=${USER} PATH=/usr/bin PHP_FCGI_CHILDREN=${PHP_FCGI_CHILDREN} PHP_FCGI_MAX_REQUESTS=${PHP_FCGI_MAX_REQUESTS} ${PHP_CGI} -b ${BIND}"
+
+	lockfile=/var/lock/subsys/nginx-php-fastcgi.lock
+}
+
+start() {
+	local retval=""
+	[ -x ${PHP_CGI} ] || exit 5
+	get_config
+	echo -n "Starting PHP FastCGI: "
+	daemon --user=${USER} "/usr/bin/env -- ${PHP_CGI_ARGS} &"
+	retval=$?
+	echo
+	[ ${retval} -eq 0 ] && touch ${lockfile}
+	sleep 2
+	[[ ${retval} -eq 0 && -S ${BIND} ]] && chmod 770 ${BIND}
+	return ${retval}
+}
+
+stop() {
+	local retval=""
+	get_config
+	echo -n "Stopping PHP FastCGI: "
+	killall -q -w -u ${USER} ${PHP_CGI}
+	retval=$?
+	echo
+	[ ${retval} -eq 0 ] && rm -f ${lockfile}
+	[[ ${retval} -eq 0 && -S ${BIND} ]] && rm -f ${BIND}
+	return ${retval}
+}
+
+restart() {
+	get_config
+	stop
+	start
+	return $?
+}
+
+status() {
+	local PIDS=""
+	get_config
+	PIDS="$(ps -u ${USER} | awk "/${PHP_CGI_NAME}/ {printf \"%s,\", \$1}")"
+	[[ -z "${PIDS}" && -f ${lockfile} ]] && echo "PHP FastCGI is not running but ${lockfile} exists" && return 2
+	[[ -n "${PIDS}" && ! -f ${lockfile} ]] && echo "PHP FastCGI is running with pids ${PIDS} but ${lockfile} is missing" && return 4
+	[[ -n "${PIDS}" && -f ${lockfile} ]] && echo "PHP FastCGI is running with pids ${PIDS}" && return 0
+
+	# all other cases means service is not running
+	return 3
+}
+
+case "$1" in
+start)		start
+		exit $?
+		;;
+stop)		stop
+		exit $?
+		;;
+restart)	restart
+		exit $?
+		;;
+status)		status
+		exit $?
+		;;
+*)		echo "Usage: php-fastcgi {start|stop|restart}"
+		exit 1
+		;;
+esac
+
+exit
