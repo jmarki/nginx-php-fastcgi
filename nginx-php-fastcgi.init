@@ -23,51 +23,53 @@ get_config() {
 	CONFIG="/etc/nginx/nginx-php-fastcgi.conf"
 	[ -f "${CONFIG}" ] || exit 6
 
-	BIND=$(awk -F"=" '/BIND/ {print $2}' ${CONFIG})
-	USER=$(awk -F"=" '/USER/ {print $2}' ${CONFIG})
-	GROUP=$(awk -F"=" '/GROUP/ {print $2}' ${CONFIG}
-	PHP_CGI=$(awk -F"=" '/PHP_CGI/ {print $2}' ${CONFIG})
-	PHP_FCGI_CHILDREN=$(awk -F"=" '/PHP_FCGI_CHILDREN/ {print $2}' ${CONFIG})
-	PHP_FCGI_MAX_REQUESTS=$(awk -F"=" '/PHP_FCGI_MAX_REQUESTS/ {print $2}' ${CONFIG})
+	LOCKFILE=/var/lock/subsys/nginx-php-fastcgi.lock
+	SOCKDIR=/var/run/nginx-php-fastcgi
 
-	: ${BIND:-/var/run/nginx-php-fastcgi/nginx-php-fastcgi.socket}
+	SOCKNAME=$(awk -F"=" '/^SOCKNAME/ {print $2}' ${CONFIG})
+	USER=$(awk -F"=" '/^USER/ {print $2}' ${CONFIG})
+	GROUP=$(awk -F"=" '/^GROUP/ {print $2}' ${CONFIG})
+	PHP_CGI=$(awk -F"=" '/^PHP_CGI/ {print $2}' ${CONFIG})
+	PHP_FCGI_CHILDREN=$(awk -F"=" '/^PHP_FCGI_CHILDREN/ {print $2}' ${CONFIG})
+	PHP_FCGI_MAX_REQUESTS=$(awk -F"=" '/^PHP_FCGI_MAX_REQUESTS/ {print $2}' ${CONFIG})
+
+	: ${SOCKNAME:-nginx-php-fastcgi.socket}
 	: ${USER:-nginx}
 	: ${GROUP:-nginx}
 	: ${PHP_CGI:-/usr/bin/php-cgi}
 	: ${PHP_FCGI_CHILDREN:-15}
 	: ${PHP_FCGI_MAX_REQUESTS:-1000}
 
+	BIND=${SOCKDIR}/${SOCKNAME}
 	PHP_CGI_NAME=$(/bin/basename ${PHP_CGI})
 	PHP_CGI_ARGS="USER=${USER} GROUP=${GROUP} PATH=/usr/bin PHP_FCGI_CHILDREN=${PHP_FCGI_CHILDREN} PHP_FCGI_MAX_REQUESTS=${PHP_FCGI_MAX_REQUESTS} ${PHP_CGI} -b ${BIND}"
-
-	lockfile=/var/lock/subsys/nginx-php-fastcgi.lock
 }
 
 start() {
-	local retval=""
+	local RETVAL=""
 	[ -x ${PHP_CGI} ] || exit 5
 	get_config
 	echo -n "Starting PHP FastCGI: "
-	/usr/bin/install -p -d -o ${USER} -g ${GROUP} -m 770 "${BIND}"
+	/usr/bin/install -p -d -o ${USER} -g ${GROUP} -m 770 "${SOCKDIR}"
 	daemon --user=${USER} "/usr/bin/env -- ${PHP_CGI_ARGS} &"
-	retval=$?
+	RETVAL=$?
 	echo
-	[ ${retval} -eq 0 ] && touch ${lockfile}
+	[ ${RETVAL} -eq 0 ] && touch ${LOCKFILE}
 	sleep 2
-	[[ ${retval} -eq 0 && -S ${BIND} ]] && chmod 770 ${BIND}
-	return ${retval}
+	[[ ${RETVAL} -eq 0 && -S ${BIND} ]] && chmod 660 ${BIND}
+	return ${RETVAL}
 }
 
 stop() {
-	local retval=""
+	local RETVAL=""
 	get_config
 	echo -n "Stopping PHP FastCGI: "
 	killall -q -w -u ${USER} ${PHP_CGI}
-	retval=$?
+	RETVAL=$?
 	echo
-	[ ${retval} -eq 0 ] && rm -f ${lockfile}
-	[[ ${retval} -eq 0 && -S ${BIND} ]] && rm -f ${BIND}
-	return ${retval}
+	[ ${RETVAL} -eq 0 ] && rm -f ${LOCKFILE}
+	[[ ${RETVAL} -eq 0 && -S ${BIND} ]] && rm -f ${BIND}
+	return ${RETVAL}
 }
 
 restart() {
@@ -81,9 +83,9 @@ status() {
 	local PIDS=""
 	get_config
 	PIDS="$(ps -u ${USER} | awk "/${PHP_CGI_NAME}/ {printf \"%s,\", \$1}")"
-	[[ -z "${PIDS}" && -f ${lockfile} ]] && echo "PHP FastCGI is not running but ${lockfile} exists" && return 2
-	[[ -n "${PIDS}" && ! -f ${lockfile} ]] && echo "PHP FastCGI is running with pids ${PIDS} but ${lockfile} is missing" && return 4
-	[[ -n "${PIDS}" && -f ${lockfile} ]] && echo "PHP FastCGI is running with pids ${PIDS}" && return 0
+	[[ -z "${PIDS}" && -f ${LOCKFILE} ]] && echo "PHP FastCGI is not running but ${LOCKFILE} exists" && return 2
+	[[ -n "${PIDS}" && ! -f ${LOCKFILE} ]] && echo "PHP FastCGI is running with pids ${PIDS} but ${LOCKFILE} is missing" && return 4
+	[[ -n "${PIDS}" && -f ${LOCKFILE} ]] && echo "PHP FastCGI is running with pids ${PIDS}" && return 0
 
 	# all other cases means service is not running
 	return 3
@@ -104,7 +106,6 @@ restart)	restart
 		;;
 *)		echo "Usage: php-fastcgi {status|start|stop|restart}"
 		exit 1
-		;;
 esac
 
 exit
