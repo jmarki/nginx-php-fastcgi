@@ -25,18 +25,20 @@ get_config() {
 
 	BIND=$(awk -F"=" '/BIND/ {print $2}' ${CONFIG})
 	USER=$(awk -F"=" '/USER/ {print $2}' ${CONFIG})
+	GROUP=$(awk -F"=" '/GROUP/ {print $2}' ${CONFIG}
 	PHP_CGI=$(awk -F"=" '/PHP_CGI/ {print $2}' ${CONFIG})
 	PHP_FCGI_CHILDREN=$(awk -F"=" '/PHP_FCGI_CHILDREN/ {print $2}' ${CONFIG})
 	PHP_FCGI_MAX_REQUESTS=$(awk -F"=" '/PHP_FCGI_MAX_REQUESTS/ {print $2}' ${CONFIG})
 
-	: ${BIND:-/var/lib/nginx/nginx-php-fastcgi.socket}
+	: ${BIND:-/var/run/nginx-php-fastcgi/nginx-php-fastcgi.socket}
 	: ${USER:-nginx}
+	: ${GROUP:-nginx}
 	: ${PHP_CGI:-/usr/bin/php-cgi}
 	: ${PHP_FCGI_CHILDREN:-15}
 	: ${PHP_FCGI_MAX_REQUESTS:-1000}
 
 	PHP_CGI_NAME=$(/bin/basename ${PHP_CGI})
-	PHP_CGI_ARGS="USER=${USER} PATH=/usr/bin PHP_FCGI_CHILDREN=${PHP_FCGI_CHILDREN} PHP_FCGI_MAX_REQUESTS=${PHP_FCGI_MAX_REQUESTS} ${PHP_CGI} -b ${BIND}"
+	PHP_CGI_ARGS="USER=${USER} GROUP=${GROUP} PATH=/usr/bin PHP_FCGI_CHILDREN=${PHP_FCGI_CHILDREN} PHP_FCGI_MAX_REQUESTS=${PHP_FCGI_MAX_REQUESTS} ${PHP_CGI} -b ${BIND}"
 
 	lockfile=/var/lock/subsys/nginx-php-fastcgi.lock
 }
@@ -46,6 +48,7 @@ start() {
 	[ -x ${PHP_CGI} ] || exit 5
 	get_config
 	echo -n "Starting PHP FastCGI: "
+	/usr/bin/install -p -d -o ${USER} -g ${GROUP} -m 770 "${BIND}"
 	daemon --user=${USER} "/usr/bin/env -- ${PHP_CGI_ARGS} &"
 	retval=$?
 	echo
@@ -87,6 +90,9 @@ status() {
 }
 
 case "$1" in
+status)		status
+		exit $?
+		;;
 start)		start
 		exit $?
 		;;
@@ -96,10 +102,7 @@ stop)		stop
 restart)	restart
 		exit $?
 		;;
-status)		status
-		exit $?
-		;;
-*)		echo "Usage: php-fastcgi {start|stop|restart}"
+*)		echo "Usage: php-fastcgi {status|start|stop|restart}"
 		exit 1
 		;;
 esac
