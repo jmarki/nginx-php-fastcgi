@@ -21,7 +21,6 @@ Requires(post):     chkconfig
 # for /sbin/service
 Requires(preun):    chkconfig, initscripts
 Requires(postun):   initscripts
-Provides:           webserver
 
 Source0:    https://github.com/jmarki/nginx-php-fastcgi/%{name}-%{version}.tar.gz
 
