@@ -1,10 +1,10 @@
 %define nginx_user      nginx
-%define nginx_home      %{_localstatedir}/lib/nginx
+%define nginx_home      %{_localstatedir}/www/nginx
 %define nginx_confdir   %{_sysconfdir}/nginx
 
 Name:           nginx-php-fastcgi
-Version:        0.1
-Release:        1%{?dist}
+Version:        0.2
+Release:        2%{?dist}
 Summary:        PHP-CGI daemon for nginx, using FastCGI
 Group:          System Environment/Daemons
 
@@ -14,7 +14,7 @@ License:        BSD
 URL:            http://github.com/jmarki/nginx-php-fastcgi
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
-Requires:           php-cli,gawk
+Requires:           php-cli, gawk, nginx
 # for /usr/sbin/useradd
 Requires(pre):      shadow-utils
 Requires(post):     chkconfig
@@ -37,8 +37,9 @@ PHP-CGI daemon for Nginx [engine x], using FastCGI
 rm -rf %{buildroot}
 %{__install} -p -d -m 0755 %{buildroot}%{nginx_confdir}/conf.d
 %{__install} -p -d -m 0755 %{buildroot}%{_initrddir}
-%{__install} -p -m 0644 %{name}.conf %{buildroot}%{nginx_confdir}/conf.d
-%{__install} -p -m 0644 fastcgi_params_php %{buildroot}%{nginx_confdir}/conf.d
+%{__install} -p -m 0644 php-fastcgi.conf %{buildroot}%{nginx_confdir}/conf.d/
+%{__install} -p -m 0644 %{name}.conf %{buildroot}%{nginx_confdir}/
+%{__install} -p -m 0644 fastcgi_params_php %{buildroot}%{nginx_confdir}/conf.d/
 %{__install} -p -m 0755 %{name}.init %{buildroot}%{_initrddir}/%{name}
 
 
@@ -69,11 +70,15 @@ fi
 %files
 %defattr(-,root,root,-)
 %{_initrddir}/%{name}
-%config(noreplace) %{nginx_confdir}/conf.d/%{name}.conf
+%config(noreplace) %{nginx_confdir}/%{name}.conf
+%config(noreplace) %{nginx_confdir}/conf.d/php-fastcgi.conf
 %config(noreplace) %{nginx_confdir}/conf.d/fastcgi_params_php
 
 
 %changelog
+* Tue May 10 2011 Koo Jun Hao <junhao82 at jmarki dot net> - 0.2
+- changed to use the more standard /var/www/nginx directory instead
+
 * Thu May 05 2011 Koo Jun Hao <junhao82 at jmarki dot net> - 0.1-1
 - modified from Nginx spec file from Fedora EPEL repository
 - initial commit of init files and configuration for PHP-CGI on nginx
