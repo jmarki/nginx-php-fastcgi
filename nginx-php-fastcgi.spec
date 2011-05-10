@@ -1,6 +1,7 @@
 %define nginx_user      nginx
 %define nginx_home      %{_localstatedir}/www/nginx
 %define nginx_confdir   %{_sysconfdir}/nginx
+%define nginx_sockdir   %{_localstatedir}/run/%{name}
 
 Name:           nginx-php-fastcgi
 Version:        0.2
@@ -13,6 +14,7 @@ Group:          System Environment/Daemons
 License:        BSD
 URL:            http://github.com/jmarki/nginx-php-fastcgi
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
+BuildArch:      noarch
 
 Requires:           php-cli, gawk, nginx
 # for /usr/sbin/useradd
@@ -35,6 +37,7 @@ PHP-CGI daemon for Nginx [engine x], using FastCGI
 %install
 rm -rf %{buildroot}
 %{__install} -p -d -m 0755 %{buildroot}%{nginx_confdir}/conf.d
+%{__install} -p -d -m 0775 -o %{nginx_user} -g %{nginx_user} %{buildroot}%{nginx_sockdir}
 %{__install} -p -d -m 0755 %{buildroot}%{_initrddir}
 %{__install} -p -m 0644 php-fastcgi.conf %{buildroot}%{nginx_confdir}/conf.d/
 %{__install} -p -m 0644 %{name}.conf %{buildroot}%{nginx_confdir}/
@@ -68,6 +71,7 @@ fi
 
 %files
 %defattr(-,root,root,-)
+%attr(0755,%{nginx_user},%{nginx_user}) %dir %{nginx_sockdir}
 %{_initrddir}/%{name}
 %config(noreplace) %{nginx_confdir}/%{name}.conf
 %config(noreplace) %{nginx_confdir}/conf.d/php-fastcgi.conf
