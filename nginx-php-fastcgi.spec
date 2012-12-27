@@ -79,6 +79,9 @@ fi
 
 
 %changelog
+* Tue Dec 27 2012 Koo Jun Hao <junhao82 at jmarki dot net> - 0.2
+- released version 0.2
+
 * Tue May 10 2011 Koo Jun Hao <junhao82 at jmarki dot net> - 0.2
 - changed to use the more standard /var/www/nginx directory instead
 
